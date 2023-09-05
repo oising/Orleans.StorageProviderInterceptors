@@ -21,10 +21,10 @@ var host = Host.CreateDefaultBuilder()
         .UseGenericStorageInterceptor<Dictionary<string, string>>("SecretsStorage", "secretsState", c =>
         {
 
-            c.OnBeforeWriteStateFunc = (grainActivationContext, currentState) =>
+            c.OnBeforeWriteStateFunc = (grainContext, currentState) =>
                 {
                     var unencryptedValues = new Dictionary<string, string>(currentState.State.Count);
-                    Console.WriteLine($"OnBeforeWriteState: {grainActivationContext.GrainIdentity.IdentityString}: Count Is {currentState.State.Count}");
+                    Console.WriteLine($"OnBeforeWriteState: {grainContext.GrainId.IdentityString}: Count Is {currentState.State.Count}");
                     foreach (var (key, value) in currentState.State)
                     {
                         Console.WriteLine($"Intercepted: {key}: {value}");
@@ -41,7 +41,7 @@ var host = Host.CreateDefaultBuilder()
             c.OnAfterWriteStateFunc = (grainActivationContext, currentState, sharedState) =>
             {
                 var unencryptedValues = (Dictionary<string, string>)sharedState!;
-                Console.WriteLine($"OnAfterWriteState: {grainActivationContext.GrainIdentity.IdentityString}: Count Is {currentState.State.Count}");
+                Console.WriteLine($"OnAfterWriteState: {grainActivationContext.GrainId.IdentityString}: Count Is {currentState.State.Count}");
                 foreach (var (key, value) in currentState.State)
                 {
                     Console.WriteLine($"What was actually persisted: {key}: {value}");
@@ -54,7 +54,7 @@ var host = Host.CreateDefaultBuilder()
 
             c.OnBeforeReadStateAsync = (grainActivationContext, currentState) =>
             {
-                Console.WriteLine($"OnBeforeReadState: {grainActivationContext.GrainIdentity.IdentityString}: Count Is {currentState.State.Count}");
+                Console.WriteLine($"OnBeforeReadState: {grainActivationContext.GrainId.IdentityString}: Count Is {currentState.State.Count}");
 
                 var unencryptedValues = new Dictionary<string, string>(currentState.State.Count);
                 foreach (var (key, value) in currentState.State)

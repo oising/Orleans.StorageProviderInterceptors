@@ -6,11 +6,12 @@ using Orleans.Core;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Storage;
-using Orleans.Utilities;
+// using Orleans.Utilities;
 using Orleans.StorageProviderInterceptors.Abstractions;
 using System.Text;
 using System.Collections.Concurrent;
 using Orleans.Hosting;
+using Serialization.TypeSystem;
 
 /// <summary>
 /// TODO
@@ -30,7 +31,7 @@ public class NamedStorageInterceptorFactory : INamedStorageInterceptorFactory
     /// <param name="context"></param>
     /// <param name="config"></param>
     /// <exception cref="InvalidOperationException"></exception>
-    public IPersistentState<TState> Create<TState>(IGrainActivationContext context, IStorageInterceptorConfig config)
+    public IPersistentState<TState> Create<TState>(IGrainContext context, IStorageInterceptorConfig config)
     {
         //var factory = string.IsNullOrEmpty(config.StorageName)
         //           ? this.services.GetService<IStorageInterceptorFactory>()
@@ -64,13 +65,14 @@ public class NamedStorageInterceptorFactory : INamedStorageInterceptorFactory
     /// </summary>
     /// <param name="context"></param>
     /// <param name="cfg"></param>
-    protected virtual string GetFullStateName(IGrainActivationContext context, IStorageInterceptorConfig cfg) => $"{RuntimeTypeNameFormatter.Format(context.GrainType)}.{cfg.StateName}";
-    internal static TypeFormattingOptions LogFormat { get; } = new TypeFormattingOptions(includeGlobal: false);
+    protected virtual string GetFullStateName(IGrainContext context, IStorageInterceptorConfig cfg) => $"{RuntimeTypeNameFormatter.Format(context.GrainType)}.{cfg.StateName}";
 
-    private static void ThrowMissingProviderException(IGrainActivationContext context, IStorageInterceptorConfig cfg)
+    //internal static TypeFormattingOptions LogFormat { get; } = new TypeFormattingOptions(includeGlobal: false);
+
+    private static void ThrowMissingProviderException(IGrainContext context, IStorageInterceptorConfig cfg)
     {
         string errMsg;
-        var grainTypeName = BuildParseableName(context.GrainType);
+        var grainTypeName = BuildParseableName(context.);
         if (string.IsNullOrEmpty(cfg.StorageName))
         {
             errMsg = $"No default storage provider found loading grain type {grainTypeName}.";
@@ -256,17 +258,17 @@ public class NamedStorageInterceptorFactory : INamedStorageInterceptorFactory
         _ => false,
     };
     /// <inheritdoc/>
-    public IPersistentState<TState> Create<TState>(IGrainActivationContext context, IStorageInterceptorFullConfig<TState> config) => throw new NotImplementedException();
+    public IPersistentState<TState> Create<TState>(IGrainContext context, IStorageInterceptorFullConfig<TState> config) => throw new NotImplementedException();
 
     private sealed class PersistentStateBridge<TState> : IPersistentState<TState>, ILifecycleParticipant<IGrainLifecycle>
     {
         private readonly string fullStateName;
-        private readonly IGrainActivationContext context;
+        private readonly IGrainContext context;
         private readonly IGrainStorage storageProvider;
         private readonly StorageInterceptorOptions<TState> options;
         private IStorage<TState> storage = default!;
 
-        public PersistentStateBridge(string fullStateName, IGrainActivationContext context, IGrainStorage storageProvider, StorageInterceptorOptions<TState> options)
+        public PersistentStateBridge(string fullStateName, IGrainContext context, IGrainStorage storageProvider, StorageInterceptorOptions<TState> options)
         {
             ArgumentNullException.ThrowIfNull(fullStateName);
             ArgumentNullException.ThrowIfNull(context);
@@ -322,7 +324,8 @@ public class NamedStorageInterceptorFactory : INamedStorageInterceptorFactory
             }
         }
 
-        public void Participate(IGrainLifecycle lifecycle) => lifecycle.Subscribe(this.GetType().FullName, GrainLifecycleStage.SetupState, this.OnSetupState);
+        public void Participate(IGrainLifecycle lifecycle) => lifecycle.Subscribe(
+            this.GetType().FullName, GrainLifecycleStage.SetupState, this.OnSetupState);
 
         private Task OnSetupState(CancellationToken ct)
         {
@@ -331,7 +334,8 @@ public class NamedStorageInterceptorFactory : INamedStorageInterceptorFactory
                 return Task.CompletedTask;
             }
 
-            this.storage = new StateStorageBridge<TState>(this.fullStateName, this.context.GrainInstance.GrainReference, this.storageProvider, this.context.ActivationServices.GetService<ILoggerFactory>());
+            this.storage = new StateStorageBridge<TState>(this.fullStateName, this.context.GrainId,
+                this.storageProvider, this.context.ActivationServices.GetService<ILoggerFactory>()!);
             return this.ReadStateAsync();
         }
     }
